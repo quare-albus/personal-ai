@@ -5,6 +5,12 @@ from telegram import Update, Bot
 from telegram.ext import Application
 from dotenv import load_dotenv
 import google.generativeai as genai
+from database import engine
+from models import Base
+from database import SessionLocal
+from models import Task
+
+Base.metadata.create_all(bind=engine)
 
 load_dotenv()
 
@@ -56,29 +62,127 @@ async def telegram_webhook(request: Request):
         }
 
     prompt = f"""
-    You are an intelligent planning assistant.
+        Extract task information from the message.
 
-    User message:
-    {text}
+        Message:
+        {text}
 
-    Existing tasks:
-    {memory[str(chat_id)]["tasks"]}
+        Return ONLY valid JSON.
 
-    If user mentions a task, summarize it clearly.
-    """
+        Example:
+        {{
+        "task": "Finish report",
+        "priority": "high"
+        }}
+        """
 
     response = model.generate_content(prompt)
 
-    ai_reply = response.text
+    data = json.loads(response.text)
 
     if "add task" in text.lower():
         memory[str(chat_id)]["tasks"].append(text)
 
+    if text == "/tasks":
+
+        tasks = db.query(Task).filter(
+            Task.chat_id == str(chat_id)
+        ).all()
+
+        reply = ""
+
+        for task in tasks:
+
+            reply += (
+                f"{task.id}. "
+                f"{task.task} "
+                f"[{task.status}]\n"
+            )
+
+        await bot.send_message(
+            chat_id=chat_id,
+            text=reply or "No tasks."
+        )
+
+        return {"ok": True}
+    
+    if text.startswith("/done"):
+
+        task_id = int(text.split(" ")[1])
+
+        task = db.query(Task).filter(
+            Task.id == task_id
+        ).first()
+
+        if task:
+
+            task.status = "completed"
+
+            db.commit()
+
+            await bot.send_message(
+                chat_id=chat_id,
+                text="Task completed."
+            )
+
+        return {"ok": True}
+
+
     save_memory(memory)
+
+    db = SessionLocal()
+
+    new_task = Task(
+
+        chat_id=str(chat_id),
+
+        task=data["task"],
+
+        priority=data["priority"],
+
+        status="pending"
+    )
+
+    db.add(new_task)
+
+    db.commit()
 
     await bot.send_message(
         chat_id=chat_id,
-        text=ai_reply
+        text=(
+            f"Task added:\n"
+            f"{data['task']}\n"
+            f"Priority: {data['priority']}"
+        )
     )
+
+    if text.startswith("/today"):
+        tasks = db.query(Task).filter(
+                Task.chat_id == str(chat_id),
+                Task.status == "pending"
+            ).all()
+
+        task_list = [
+            task.task for task in tasks
+        ]
+
+        prompt = f"""
+        Generate a realistic plan for today.
+
+        Tasks:
+        {task_list}
+
+        Constraints:
+        - avoid burnout
+        - prioritize important tasks
+        - include breaks
+        """
+
+        response = model.generate_content(prompt)
+
+        await bot.send_message(
+            chat_id=chat_id,
+            text=response.text
+        )
 
     return {"ok": True}

@@ -1,6 +1,7 @@
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.13.0
+APScheduler==3.11.2
 certifi==2026.4.22
 cffi==2.0.0
 charset-normalizer==3.4.7
@@ -14,6 +15,7 @@ google-auth==2.53.0
 google-auth-httplib2==0.4.0
 google-generativeai==0.8.6
 googleapis-common-protos==1.75.0
+greenlet==3.5.0
 grpcio==1.80.0
 grpcio-status==1.71.2
 h11==0.16.0
@@ -32,10 +34,12 @@ pyparsing==3.3.2
 python-dotenv==1.2.2
 python-telegram-bot==22.7
 requests==2.34.2
+SQLAlchemy==2.0.49
 starlette==1.0.0
 tqdm==4.67.3
 typing-inspection==0.4.2
 typing_extensions==4.15.0
+tzlocal==5.3.1
 uritemplate==4.2.0
 urllib3==2.7.0
 uvicorn==0.47.0
